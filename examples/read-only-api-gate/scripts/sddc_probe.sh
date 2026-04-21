@@ -100,7 +100,7 @@ tasks_response=$(curl -sS "${curl_tls_args[@]}" \
 
 domain_count=$(echo "${domains_response}" | jq 'if type=="array" then length else (.elements // [] | length) end')
 failed_task_count=$(echo "${tasks_response}" | jq '[((if type=="array" then . else (.elements // []) end)[]? | .status // .taskStatus // "") | ascii_upcase | select(. == "FAILED")] | length')
-failing_task_ids=$(echo "${tasks_response}" | jq -c '[((if type=="array" then . else (.elements // []) end)[]? | select(((.status // .taskStatus // "") | ascii_upcase) == "FAILED") | (.id // .taskId // "unknown")]')
+failing_task_ids=$(echo "${tasks_response}" | jq -c '[((if type=="array" then . else (.elements // []) end)[]? | select(((.status // .taskStatus // "") | ascii_upcase) == "FAILED") | (.id // .taskId // "unknown"))]')
 
 jq -n \
   --arg host "${host}" \
