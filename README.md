@@ -17,6 +17,10 @@ What it tests:
 1. API authentication to SDDC Manager (`POST /v1/tokens`)
 2. Domain inventory is reachable (`GET /v1/domains`)
 3. No failed tasks in the returned task list (`GET /v1/tasks?pageSize=<task_limit>`)
+4. Captures domain metadata for reporting:
+   - domain IDs
+   - domain names
+   - best-effort capacity fields returned on each domain object
 
 If a check fails, `terraform plan` exits non-zero, which makes it useful as a
 "pipeline quality gate" style step.
@@ -55,3 +59,16 @@ terraform -chdir=examples/read-only-api-gate plan -input=false -no-color
 ```
 
 No `apply` step is required for this pattern.
+
+## Extra output for blog/demo reporting
+
+The `api_health_summary` output now includes:
+- `domain_ids` (list of IDs)
+- `domain_names` (list of names)
+- `domain_capacity` (per-domain best-effort capacity summary from API payload)
+
+Show it with:
+
+```bash
+terraform output api_health_summary
+```

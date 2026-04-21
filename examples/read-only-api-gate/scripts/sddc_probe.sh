@@ -81,6 +81,9 @@ if [[ -z "${access_token}" ]]; then
       timestamp_utc: $timestamp_utc,
       auth_ok: "false",
       domain_count: "0",
+      domain_ids: "[]",
+      domain_names: "[]",
+      domain_capacity: "[]",
       failed_task_count: "0",
       failing_task_ids: "[]",
       error: $error
@@ -99,6 +102,21 @@ tasks_response=$(curl -sS "${curl_tls_args[@]}" \
   "${base_url}/v1/tasks?pageSize=${task_limit}")
 
 domain_count=$(echo "${domains_response}" | jq 'if type=="array" then length else (.elements // [] | length) end')
+domain_ids=$(echo "${domains_response}" | jq -c '[((if type=="array" then . else (.elements // []) end)[]? | (.id // .domainId // .uuid // "unknown"))]')
+domain_names=$(echo "${domains_response}" | jq -c '[((if type=="array" then . else (.elements // []) end)[]? | (.name // .domainName // "unknown"))]')
+domain_capacity=$(echo "${domains_response}" | jq -c '[
+  ((if type=="array" then . else (.elements // []) end)[]? | {
+    id: (.id // .domainId // .uuid // "unknown"),
+    name: (.name // .domainName // "unknown"),
+    current_capacity: (
+      .currentCapacity
+      // .capacity
+      // .resourceCapacity
+      // .capacitySummary
+      // {}
+    )
+  })
+]')
 failed_task_count=$(echo "${tasks_response}" | jq '[((if type=="array" then . else (.elements // []) end)[]? | .status // .taskStatus // "") | ascii_upcase | select(. == "FAILED")] | length')
 failing_task_ids=$(echo "${tasks_response}" | jq -c '[((if type=="array" then . else (.elements // []) end)[]? | select(((.status // .taskStatus // "") | ascii_upcase) == "FAILED") | (.id // .taskId // "unknown"))]')
 
@@ -106,6 +124,9 @@ jq -n \
   --arg host "${host}" \
   --arg timestamp_utc "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
   --arg domain_count "${domain_count}" \
+  --arg domain_ids "${domain_ids}" \
+  --arg domain_names "${domain_names}" \
+  --arg domain_capacity "${domain_capacity}" \
   --arg failed_task_count "${failed_task_count}" \
   --arg failing_task_ids "${failing_task_ids}" \
   '{
@@ -113,6 +134,9 @@ jq -n \
     timestamp_utc: $timestamp_utc,
     auth_ok: "true",
     domain_count: $domain_count,
+    domain_ids: $domain_ids,
+    domain_names: $domain_names,
+    domain_capacity: $domain_capacity,
     failed_task_count: $failed_task_count,
     failing_task_ids: $failing_task_ids
   }'
