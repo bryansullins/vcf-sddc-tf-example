@@ -21,6 +21,7 @@ What it tests:
    - domain IDs
    - domain names
    - best-effort capacity fields returned on each domain object
+5. Warns when domain memory free percent is below threshold (default 15%)
 
 If a check fails, `terraform plan` exits non-zero, which makes it useful as a
 "pipeline quality gate" style step.
@@ -49,6 +50,9 @@ insecure = true
 # gate threshold: fail if more than this many failed tasks are returned
 max_failed_tasks = 0
 task_limit       = 50
+
+# warning threshold: memory free percent lower than this triggers a check warning
+min_memory_free_percent = 15
 ```
 
 ## CI snippet (generic)
@@ -66,6 +70,7 @@ The `api_health_summary` output now includes:
 - `domain_ids` (list of IDs)
 - `domain_names` (list of names)
 - `domain_capacity` (per-domain best-effort capacity summary from API payload)
+- `low_memory_domains` (domains below free-memory threshold)
 
 Show it with:
 

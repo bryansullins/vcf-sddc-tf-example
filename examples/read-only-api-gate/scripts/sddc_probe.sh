@@ -6,7 +6,7 @@ if [[ "${TRACE:-}" == "1" ]]; then
 fi
 
 if [[ $# -lt 4 ]]; then
-  echo "usage: $0 --fqdn <sddc_manager_fqdn> --username <username> --password <password> [--insecure true|false] [--task-limit N]" >&2
+  echo "usage: $0 --fqdn <sddc_manager_fqdn> --username <username> --password <password> [--insecure true|false] [--task-limit N] [--memory-free-warning-percent N]" >&2
   exit 2
 fi
 
@@ -15,6 +15,7 @@ username=""
 password=""
 insecure="false"
 task_limit="50"
+memory_free_warning_percent="15"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -36,6 +37,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --task-limit)
       task_limit="$2"
+      shift 2
+      ;;
+    --memory-free-warning-percent)
+      memory_free_warning_percent="$2"
       shift 2
       ;;
     *)
@@ -84,6 +89,8 @@ if [[ -z "${access_token}" ]]; then
       domain_ids: "[]",
       domain_names: "[]",
       domain_capacity: "[]",
+      memory_free_warnings: "[]",
+      memory_free_warning_count: "0",
       failed_task_count: "0",
       failing_task_ids: "[]",
       error: $error
@@ -117,6 +124,53 @@ domain_capacity=$(echo "${domains_response}" | jq -c '[
     )
   })
 ]')
+memory_free_warnings=$(echo "${domains_response}" | jq -c --argjson threshold "${memory_free_warning_percent}" '
+  def items: if type=="array" then . else (.elements // []) end;
+  def num(v):
+    if v == null then null
+    elif (v | type) == "number" then v
+    elif (v | type) == "string" then (v | tonumber?)
+    else null
+    end;
+  def first_num(a): (a | map(num(.)) | map(select(. != null)) | .[0] // null);
+  [
+    items[]? as $d
+    | ($d.currentCapacity // $d.capacity // $d.resourceCapacity // $d.capacitySummary // {}) as $c
+    | first_num([
+        $c.memory.free,
+        $c.memory.available,
+        $c.memory.freeMemory,
+        $c.memory.availableMemory,
+        $c.memoryCapacity.free,
+        $c.memoryCapacity.available,
+        $c.memorySummary.free,
+        $c.memorySummary.available,
+        $c.freeMemory,
+        $c.availableMemory,
+        $c.memoryFree,
+        $c.memoryAvailable
+      ]) as $free
+    | first_num([
+        $c.memory.total,
+        $c.memory.capacity,
+        $c.memory.totalMemory,
+        $c.memoryCapacity.total,
+        $c.memoryCapacity.capacity,
+        $c.memorySummary.total,
+        $c.memorySummary.capacity,
+        $c.totalMemory,
+        $c.memoryTotal
+      ]) as $total
+    | select($free != null and $total != null and $total > 0)
+    | (($free / $total) * 100) as $pct
+    | select($pct < $threshold)
+    | {
+        id: ($d.id // $d.domainId // $d.uuid // "unknown"),
+        name: ($d.name // $d.domainName // "unknown"),
+        free_percent: (($pct * 100 | round) / 100)
+      }
+  ]')
+memory_free_warning_count=$(echo "${memory_free_warnings}" | jq 'length')
 failed_task_count=$(echo "${tasks_response}" | jq '[((if type=="array" then . else (.elements // []) end)[]? | .status // .taskStatus // "") | ascii_upcase | select(. == "FAILED")] | length')
 failing_task_ids=$(echo "${tasks_response}" | jq -c '[((if type=="array" then . else (.elements // []) end)[]? | select(((.status // .taskStatus // "") | ascii_upcase) == "FAILED") | (.id // .taskId // "unknown"))]')
 
@@ -127,6 +181,8 @@ jq -n \
   --arg domain_ids "${domain_ids}" \
   --arg domain_names "${domain_names}" \
   --arg domain_capacity "${domain_capacity}" \
+  --arg memory_free_warnings "${memory_free_warnings}" \
+  --arg memory_free_warning_count "${memory_free_warning_count}" \
   --arg failed_task_count "${failed_task_count}" \
   --arg failing_task_ids "${failing_task_ids}" \
   '{
@@ -137,6 +193,8 @@ jq -n \
     domain_ids: $domain_ids,
     domain_names: $domain_names,
     domain_capacity: $domain_capacity,
+    memory_free_warnings: $memory_free_warnings,
+    memory_free_warning_count: $memory_free_warning_count,
     failed_task_count: $failed_task_count,
     failing_task_ids: $failing_task_ids
   }'

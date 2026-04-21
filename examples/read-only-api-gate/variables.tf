@@ -31,3 +31,9 @@ variable "task_limit" {
   type        = number
   default     = 50
 }
+
+variable "min_memory_free_percent" {
+  description = "Warn when any domain reports memory free percent below this threshold."
+  type        = number
+  default     = 15
+}

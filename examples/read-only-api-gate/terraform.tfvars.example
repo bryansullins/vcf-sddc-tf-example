@@ -4,3 +4,4 @@ password          = "replace-me"
 insecure          = true
 max_failed_tasks  = 0
 task_limit        = 50
+min_memory_free_percent = 15
