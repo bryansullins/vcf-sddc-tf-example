@@ -1,0 +1,6 @@
+sddc_manager_fqdn = "sddc-manager.lab.local"
+username          = "administrator@vsphere.local"
+password          = "replace-me"
+insecure          = true
+max_failed_tasks  = 0
+task_limit        = 50
